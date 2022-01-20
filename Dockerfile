@@ -1,5 +1,5 @@
 # Base image:
-FROM golang:1.15-alpine3.14
+FROM golang:1.16-alpine3.14
 
 # Install golint
 ENV GOPATH /go
