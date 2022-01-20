@@ -4,7 +4,7 @@ FROM golang:1.15
 # Install golint
 ENV GOPATH /go
 ENV PATH ${GOPATH}/bin:$PATH
-RUN go get -u github.com/golang/lint/golint
+RUN go get -u golang.org/x/lint
 
 # Add apt key for LLVM repository
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
