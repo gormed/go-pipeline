@@ -6,4 +6,4 @@ RUN apk add --no-cache git gcc musl-dev make
 # Install golint
 ENV GOPATH /go
 ENV PATH ${GOPATH}/bin:$PATH
-RUN go get -u honnef.co/go/tools
+RUN go install honnef.co/go/tools/cmd/staticcheck@latest
