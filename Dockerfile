@@ -1,9 +1,21 @@
 # Base image:
-FROM golang:1.16-alpine3.14
+FROM golang:1.26-alpine3.23
 
-RUN apk add --no-cache git gcc musl-dev make
+ENV GOPATH=/go
+ENV PATH=${GOPATH}/bin:${PATH}
+ENV GOCACHE=/go/build-cache
 
-# Install golint
-ENV GOPATH /go
-ENV PATH ${GOPATH}/bin:$PATH
-RUN go install honnef.co/go/tools/cmd/staticcheck@latest
+RUN apk add --no-cache \
+		bash \
+		ca-certificates \
+		gcc \
+		git \
+		make \
+		musl-dev \
+		openssh-client \
+		tzdata \
+	&& update-ca-certificates \
+	&& mkdir -p /go/build-cache
+
+RUN go install honnef.co/go/tools/cmd/staticcheck@latest \
+	&& go install github.com/onsi/ginkgo/v2/ginkgo@latest
