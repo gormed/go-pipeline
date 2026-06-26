@@ -54,3 +54,5 @@ jobs:
           platforms: ${{ env.DOCKER_BUILD_PLATFORM }}
           push: true
           tags: ${{ env.DOCKER_HUB_ORG }}/${{ matrix.image }}:${{ env.DOCKER_HUB_TAG }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
