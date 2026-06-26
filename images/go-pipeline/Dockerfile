@@ -1,4 +1,3 @@
-# Base image:
 FROM golang:1.26-alpine3.23
 
 ENV GOPATH=/go
