@@ -10,6 +10,7 @@ RUN apk add --no-cache \
 		ca-certificates \
 		gcc \
 		git \
+		linux-headers \
 		make \
 		musl-dev \
 		openssh-client \
