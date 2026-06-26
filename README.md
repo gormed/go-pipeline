@@ -1,21 +1,27 @@
-# go-pipeline
+# golang CI pipeline
 
-GitLab CI image for Go projects.
+GitLab CI pipeline infrastructure for Go projects.
 
-Included base/runtime:
+## CI Images
+
+Images live under `images/<name>/` and are automatically built and pushed to Docker Hub on every push to `main` via `.github/workflows/docker.yml`.
+
+### go-pipeline
+
+Base image for Go projects (`voidptrorg/go-pipeline:latest`).
+
+Included:
 
 - Go 1.26 (Alpine)
-- git, make, gcc, musl-dev
+- git, make, gcc, musl-dev, linux-headers
 - bash, openssh-client, ca-certificates, tzdata
 
 Preinstalled Go tools:
 
-- staticcheck
-- ginkgo
+- golangci-lint v2.12.2
+- ginkgo v2.32.0
 
-## Publish Workflow
-
-Build and push the image as multi-arch so both amd64 and arm64 runners can use it.
+### Manual publish
 
 One-time builder setup:
 
@@ -41,16 +47,11 @@ Verify published platforms:
 docker buildx imagetools inspect voidptrorg/go-pipeline:latest
 ```
 
-Expected platforms include:
-
-- linux/amd64
-- linux/arm64
-
-If only one platform is present, Docker executor jobs on the other architecture can fail with an exec format error.
+Both `linux/amd64` and `linux/arm64` must be present. If only one is listed, Docker executor jobs on the other architecture will fail with an exec format error.
 
 ## Raspberry Pi Shell Runner
 
-Device tests (`//go:build device_tests`) require real hardware and run on a dedicated Raspberry Pi registered as a shell-executor runner tagged `rpi`.
+Device tests (`//go:build device_tests`) require real hardware and run on a Raspberry Pi registered as a shell-executor runner tagged `rpi`.
 
 ### Prerequisites
 
@@ -61,7 +62,7 @@ Device tests (`//go:build device_tests`) require real hardware and run on a dedi
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y git make gcc libc-dev linux-headers-$(uname -r)
+sudo apt-get install -y git make gcc libc6-dev raspberrypi-kernel-headers
 ```
 
 ### Install Go
@@ -70,8 +71,8 @@ Install Go >= 1.21 (match the version in the project's `go.mod`):
 
 ```sh
 # Check https://go.dev/dl/ for the latest ARM release
-curl -LO https://go.dev/dl/go1.26.linux-arm64.tar.gz   # arm64
-# or: go1.26.linux-armv6l.tar.gz for 32-bit Pi
+curl -LO https://go.dev/dl/go1.26.linux-arm64.tar.gz   # arm64 (64-bit Pi)
+# or: go1.26.linux-armv6l.tar.gz for 32-bit Pi Zero
 sudo tar -C /usr/local -xzf go1.26.linux-*.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee /etc/profile.d/go.sh
 ```
@@ -83,7 +84,7 @@ curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/s
 sudo apt-get install -y gitlab-runner
 ```
 
-Register the runner (obtain `RUNNER_TOKEN` from **GitLab → Settings → CI/CD → Runners**):
+Obtain `RUNNER_TOKEN` from **GitLab → Admin → Runners → Register an instance runner** (or per-project under **Settings → CI/CD → Runners**):
 
 ```sh
 sudo gitlab-runner register \
@@ -98,17 +99,12 @@ sudo gitlab-runner register \
 
 ### Allow runner access to I2C
 
-The `gitlab-runner` OS user needs to be in the `i2c` group so device tests can open the bus:
-
 ```sh
 sudo usermod -aG i2c gitlab-runner
-# Restart the runner to pick up the new group
 sudo systemctl restart gitlab-runner
 ```
 
 ### Corresponding CI job
-
-To target this runner from a project, add a job tagged `rpi`. Example for lateralus:
 
 ```yaml
 device_tests:

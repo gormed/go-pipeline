@@ -17,5 +17,5 @@ RUN apk add --no-cache \
 	&& update-ca-certificates \
 	&& mkdir -p /go/build-cache
 
-RUN go install honnef.co/go/tools/cmd/staticcheck@latest \
-	&& go install github.com/onsi/ginkgo/v2/ginkgo@latest
+RUN go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2 \
+	&& go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.0
