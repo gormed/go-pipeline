@@ -71,32 +71,17 @@ Install Go >= 1.21 (match the version in the project's `go.mod`):
 
 ```sh
 # Check https://go.dev/dl/ for the latest ARM release
-curl -LO https://go.dev/dl/go1.26.linux-arm64.tar.gz   # arm64 (64-bit Pi)
-# or: go1.26.linux-armv6l.tar.gz for 32-bit Pi Zero
-sudo tar -C /usr/local -xzf go1.26.linux-*.tar.gz
+if [ "$(uname -m)" = "aarch64" ]; then
+  GO_TGZ="go1.26.0.linux-arm64.tar.gz"      # 64-bit Pi OS / DietPi
+else
+  GO_TGZ="go1.26.0.linux-armv6l.tar.gz"     # 32-bit Pi OS / DietPi (Pi Zero, Pi 3, Pi 4 on armv7l)
+fi
+curl -fL -o "$GO_TGZ" "https://go.dev/dl/$GO_TGZ"
+sudo tar -C /usr/local -xzf "$GO_TGZ"
 echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee /etc/profile.d/go.sh
 sudo ln -sf /usr/local/go/bin/go /usr/local/bin/go
 sudo ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
 /usr/local/go/bin/go version
-```
-
-Verify Go is available for the runner user:
-
-```sh
-sudo -u gitlab-runner bash -lc 'command -v go && go version'
-```
-
-Optional fallback (only if `go` is still not found in runner jobs):
-
-```sh
-sudo mkdir -p /etc/systemd/system/gitlab-runner.service.d
-sudo tee /etc/systemd/system/gitlab-runner.service.d/path.conf >/dev/null <<'EOF'
-[Service]
-Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin"
-EOF
-sudo systemctl daemon-reload
-sudo systemctl restart gitlab-runner
-sudo -u gitlab-runner bash -lc 'command -v go && go version'
 ```
 
 ### Install and register gitlab-runner
@@ -141,8 +126,8 @@ scp -O gitlab-runner dietpi@pi-zero-01:/tmp/gitlab-runner
 # On the Pi:
 sudo install -m 0755 /tmp/gitlab-runner /usr/local/bin/gitlab-runner
 id -u gitlab-runner >/dev/null 2>&1 || sudo useradd --comment 'GitLab Runner' --create-home gitlab-runner --shell /bin/bash
-sudo /usr/local/bin/gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
-sudo /usr/local/bin/gitlab-runner start
+sudo gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
+sudo gitlab-runner start
 ```
 
 Obtain a registration token from **GitLab → Admin → Runners → Register an instance runner** (or per-project under **Settings → CI/CD → Runners**) and export it as `RUNNER_REGISTRATION_TOKEN`:
@@ -152,7 +137,7 @@ export RUNNER_REGISTRATION_TOKEN="<paste-token-here>"
 ```
 
 ```sh
-sudo /usr/local/bin/gitlab-runner register \
+sudo gitlab-runner register \
   --non-interactive \
   --url "https://gitlab.void-ptr.org/" \
   --registration-token "$RUNNER_REGISTRATION_TOKEN" \
@@ -169,19 +154,40 @@ sudo usermod -aG i2c gitlab-runner
 sudo systemctl restart gitlab-runner
 ```
 
+### Troubleshoot
+
+Verify Go is available for the runner user:
+
+```sh
+sudo -u gitlab-runner bash -lc 'command -v go && go version'
+```
+
+Optional fallback (only if `go` is still not found in runner jobs):
+
+```sh
+sudo mkdir -p /etc/systemd/system/gitlab-runner.service.d
+sudo tee /etc/systemd/system/gitlab-runner.service.d/path.conf >/dev/null <<'EOF'
+[Service]
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin"
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart gitlab-runner
+sudo -u gitlab-runner bash -lc 'command -v go && go version'
+```
+
 ### Uninstall runner
 
 Unregister all configured runners on the host:
 
 ```sh
-sudo /usr/local/bin/gitlab-runner unregister --all-runners || true
+sudo gitlab-runner unregister --all-runners || true
 ```
 
 Stop and uninstall the local service (works for custom binary installs):
 
 ```sh
-sudo /usr/local/bin/gitlab-runner stop || true
-sudo /usr/local/bin/gitlab-runner uninstall || true
+sudo gitlab-runner stop || true
+sudo gitlab-runner uninstall || true
 ```
 
 Remove runner packages if this host used the apt install path:
