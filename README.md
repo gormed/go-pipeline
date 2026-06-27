@@ -75,26 +75,91 @@ curl -LO https://go.dev/dl/go1.26.linux-arm64.tar.gz   # arm64 (64-bit Pi)
 # or: go1.26.linux-armv6l.tar.gz for 32-bit Pi Zero
 sudo tar -C /usr/local -xzf go1.26.linux-*.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee /etc/profile.d/go.sh
+sudo ln -sf /usr/local/go/bin/go /usr/local/bin/go
+sudo ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+/usr/local/go/bin/go version
+```
+
+Verify Go is available for the runner user:
+
+```sh
+sudo -u gitlab-runner bash -lc 'command -v go && go version'
+```
+
+Optional fallback (only if `go` is still not found in runner jobs):
+
+```sh
+sudo mkdir -p /etc/systemd/system/gitlab-runner.service.d
+sudo tee /etc/systemd/system/gitlab-runner.service.d/path.conf >/dev/null <<'EOF'
+[Service]
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin"
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart gitlab-runner
+sudo -u gitlab-runner bash -lc 'command -v go && go version'
 ```
 
 ### Install and register gitlab-runner
+
+Check CPU architecture first:
+
+```sh
+uname -m
+```
+
+- `armv6l` (Pi Zero / Pi Zero W): the current `gitlab-runner` Debian package can fail with `Illegal instruction` during post-install.
+- `armv7l` / `aarch64` (Pi Zero 2 / Pi 3 / Pi 4 / Pi 5): use the package install below.
 
 ```sh
 curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | sudo bash
 sudo apt-get install -y gitlab-runner
 ```
 
-Obtain `RUNNER_TOKEN` from **GitLab → Admin → Runners → Register an instance runner** (or per-project under **Settings → CI/CD → Runners**):
+If you already hit `Illegal instruction` on `armv6l`, clean up the broken package state:
 
 ```sh
-sudo gitlab-runner register \
+sudo sh -c 'printf "#!/bin/sh\nexit 0\n" > /var/lib/dpkg/info/gitlab-runner.prerm'
+sudo sh -c 'printf "#!/bin/sh\nexit 0\n" > /var/lib/dpkg/info/gitlab-runner.postrm'
+sudo sh -c 'printf "#!/bin/sh\nexit 0\n" > /var/lib/dpkg/info/gitlab-runner.postinst'
+sudo chmod +x /var/lib/dpkg/info/gitlab-runner.prerm /var/lib/dpkg/info/gitlab-runner.postrm /var/lib/dpkg/info/gitlab-runner.postinst
+sudo dpkg --remove --force-remove-reinstreq --force-all gitlab-runner || true
+sudo dpkg --purge --force-all gitlab-runner || true
+sudo apt-get remove --purge -y gitlab-runner-helper-images || true
+sudo dpkg --configure -a
+sudo apt-get -f install
+```
+
+For Pi Zero / Pi Zero W (`armv6l`), use a custom armv6 runner binary instead of the Debian package:
+
+```sh
+# Build on macOS or Linux with Go installed, then copy to the Pi.
+git clone https://gitlab.com/gitlab-org/gitlab-runner.git
+cd gitlab-runner
+GOOS=linux GOARCH=arm GOARM=6 CGO_ENABLED=0 go build -o gitlab-runner .
+scp -O gitlab-runner dietpi@pi-zero-01:/tmp/gitlab-runner
+
+# On the Pi:
+sudo install -m 0755 /tmp/gitlab-runner /usr/local/bin/gitlab-runner
+id -u gitlab-runner >/dev/null 2>&1 || sudo useradd --comment 'GitLab Runner' --create-home gitlab-runner --shell /bin/bash
+sudo /usr/local/bin/gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
+sudo /usr/local/bin/gitlab-runner start
+```
+
+Obtain a registration token from **GitLab → Admin → Runners → Register an instance runner** (or per-project under **Settings → CI/CD → Runners**) and export it as `RUNNER_REGISTRATION_TOKEN`:
+
+```sh
+export RUNNER_REGISTRATION_TOKEN="<paste-token-here>"
+```
+
+```sh
+sudo /usr/local/bin/gitlab-runner register \
   --non-interactive \
   --url "https://gitlab.void-ptr.org/" \
-  --token "$RUNNER_TOKEN" \
+  --registration-token "$RUNNER_REGISTRATION_TOKEN" \
   --executor shell \
   --description "rpi-device-runner" \
   --tag-list "rpi" \
-  --run-untagged false
+  --run-untagged=false
 ```
 
 ### Allow runner access to I2C
@@ -113,6 +178,7 @@ device_tests:
   stage: test
   script:
     - make deps
+    - make tools
     - make test-device-ginkgo
   when: manual
 ```
