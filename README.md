@@ -169,6 +169,36 @@ sudo usermod -aG i2c gitlab-runner
 sudo systemctl restart gitlab-runner
 ```
 
+### Uninstall runner
+
+Unregister all configured runners on the host:
+
+```sh
+sudo /usr/local/bin/gitlab-runner unregister --all-runners || true
+```
+
+Stop and uninstall the local service (works for custom binary installs):
+
+```sh
+sudo /usr/local/bin/gitlab-runner stop || true
+sudo /usr/local/bin/gitlab-runner uninstall || true
+```
+
+Remove runner packages if this host used the apt install path:
+
+```sh
+sudo apt-get remove --purge -y gitlab-runner gitlab-runner-helper-images || true
+sudo apt-get -f install
+```
+
+Cleanup local state, custom binary, and runner user:
+
+```sh
+sudo rm -f /usr/local/bin/gitlab-runner
+sudo rm -rf /etc/gitlab-runner /home/gitlab-runner
+sudo userdel --remove gitlab-runner || true
+```
+
 ### Corresponding CI job
 
 ```yaml
@@ -176,6 +206,11 @@ device_tests:
   tags:
     - rpi
   stage: test
+  variables:
+    GOCACHE: "$CI_PROJECT_DIR/.cache/go-build"
+    GOMODCACHE: "$CI_PROJECT_DIR/.cache/go-mod"
+  before_script:
+    - mkdir -p "$GOCACHE" "$GOMODCACHE"
   script:
     - make deps
     - make tools
